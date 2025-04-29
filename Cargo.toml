@@ -1,0 +1,9 @@
+[package]
+name = "databaseS2"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.3"
+sqlx = { version = "0.8.5", features = ["runtime-tokio-native-tls", "sqlite", "macros"] }
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"]}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "-- candiates table\ncreate table if not exists candidates as\n    select firstname, surname\n    from election_results;\n\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "a82ca270c4a6ea260ded609bc3fab4990db00ef42093fa06a6207489e674d704"
+}
