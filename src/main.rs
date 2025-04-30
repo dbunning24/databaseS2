@@ -1,11 +1,13 @@
-use sqlx::{error::DatabaseError, migrate::MigrateDatabase, Sqlite, SqlitePool};
-use std::error::Error;
+use sqlx::{Sqlite, SqlitePool, migrate::MigrateDatabase};
+use std::process;
+
 mod utils;
 
 const DB_URL: &'static str = "sqlite://sqlite.db";
 
 #[tokio::main]
-async fn main(){
+async fn main() {
+    // create database file if it isn't present
     println!("[+] searching for database at {}", DB_URL);
     if !Sqlite::database_exists(DB_URL).await.unwrap_or(false) {
         println!("[#] creating database at {}", DB_URL);
@@ -16,15 +18,17 @@ async fn main(){
     } else {
         println!("[+] found database");
     }
+
+    // connect to the database and run table creation script
     let db = SqlitePool::connect(DB_URL).await.unwrap();
-    let res = match sqlx::query(include_str!("../sql/create_tables.sql")).execute(&db).await {
-        Ok(e) => {
-            println!("{e:?}");
-            e
-        },
+    let _ = match sqlx::query(include_str!("../sql/create_tables.sql"))
+        .execute(&db)
+        .await
+    {
+        Ok(_) => (),
         Err(e) => {
-            eprintln!("{e:?}");
-            panic!();
+            eprintln!("[-] ERROR: {e:?}");
+            process::exit(1)
         }
     };
 }
