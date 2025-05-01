@@ -8,43 +8,43 @@ drop table if exists regions;
 drop table if exists countries;
 drop table if exists parties;
 
--- location data
+-- location data - creates tables and inserts relevant data from raw results table
 CREATE TABLE counties (
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(100) NOT NULL
+    county_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    county_name VARCHAR(100) NOT NULL
 );
-INSERT INTO counties (name)
+INSERT INTO counties (county_name)
     SELECT DISTINCT county_name FROM election_results_raw;
 
 CREATE TABLE countries (
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(100) NOT NULL
+    country_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    country_name VARCHAR(100) NOT NULL
 );
-INSERT INTO countries (name)
+INSERT INTO countries (country_name)
     SELECT DISTINCT country_name FROM election_results_raw;
 
 CREATE TABLE regions (
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(100) NOT NULL
+    region_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    region_name VARCHAR(100) NOT NULL
 );
-INSERT INTO regions (name)
+INSERT INTO regions (region_name)
     SELECT DISTINCT region_name FROM election_results_raw;
 
 CREATE TABLE constituencies (
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(100) NOT NULL
+    constituency_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    constituency_name VARCHAR(100) NOT NULL
 );
-INSERT INTO constituencies (name)
+INSERT INTO constituencies (constituency_name)
     SELECT DISTINCT constituency_name FROM election_results_raw;
 
 -- party data
 CREATE TABLE parties (
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(100) NOT NULL,
+    party_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    party_name VARCHAR(100) NOT NULL,
     abbreviation VARCHAR(10) NOT NULL
 );
 
-INSERT INTO parties (name, abbreviation)
+INSERT INTO parties (party_name, abbreviation)
     SELECT DISTINCT party_name, party_abbreviation FROM election_results_raw;
 
 -- candidate and vote data
@@ -59,7 +59,7 @@ CREATE TABLE candidates (
 );
 
 INSERT INTO candidates (firstname, surname, gender, constituency, party, votes)
-    SELECT r.firstname, r.surname, r.gender, con.id, p.id, r.votes
+    SELECT r.firstname, r.surname, r.gender, con.constituency_id, p.party_id, r.votes
     FROM election_results_raw r
-    INNER JOIN constituencies con ON r.constituency_name = con.name 
-    INNER JOIN parties p ON r.party_name = p.name;
+    INNER JOIN constituencies con ON r.constituency_name = con.constituency_name 
+    INNER JOIN parties p ON r.party_name = p.party_name;
