@@ -1,3 +1,4 @@
+#![allow(unused)]
 use sqlx::{Row, Sqlite, SqlitePool, migrate::MigrateDatabase, sqlite::SqliteRow};
 use std::process;
 
@@ -34,15 +35,11 @@ async fn main() {
     };
 
     // First past the post by Constituency
-    let firstPastPost =
+    let first_past_post =
         match sqlx::query_as::<_, PartyConstituency>
-        ("select max(votes) as votes, party_name, constituency_name 
-            from (
-                select c.votes, p.party_name, con.constituency_name from parties p, constituencies con, candidates c  
+        ("select c.votes, p.party_name, con.constituency_name from parties p, constituencies con, candidates c  
                 where p.party_id = c.party and con.constituency_id = c.constituency
-            ) group by constituency_name;
         ").fetch_all(&db).await {
-            
             Ok(e) => {
                 for row in &e {
                     println!("[{} VOTES] -  {} - {}", row.votes, row.party, row.con);
