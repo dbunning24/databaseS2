@@ -34,16 +34,12 @@ async fn main() {
         }
     };
 
-    // First past the post by Constituency
+    // FPTP by Constituency
     let first_past_post =
-        match sqlx::query_as::<_, PartyConstituency>
-        ("select c.votes, p.party_name, con.constituency_name from parties p, constituencies con, candidates c  
-                where p.party_id = c.party and con.constituency_id = c.constituency
-        ").fetch_all(&db).await {
+        match sqlx::query_as::<_, Results>
+        ("select * from party_seats order by seats;")
+        .fetch_all(&db).await {
             Ok(e) => {
-                for row in &e {
-                    println!("[{} VOTES] -  {} - {}", row.votes, row.party, row.con);
-                }
                 e
             }
             Err(e) => {
