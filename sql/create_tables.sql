@@ -114,4 +114,5 @@ CREATE VIEW IF NOT EXISTS vpc_winners AS
 CREATE VIEW IF NOT EXISTS party_seats as 
     select party_name, count(*) as seats 
     from vpc_winners
-    group by party_name;
+    group by party_name
+    order by seats desc;
