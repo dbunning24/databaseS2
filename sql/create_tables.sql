@@ -12,6 +12,7 @@ drop table if exists results;
 drop view if exists vpc;
 drop view if exists vpc_winners;
 drop view if exists party_seats;
+drop view if exists party_votes;
 
 -- location data - creates tables and inserts relevant data from raw results table
 
@@ -97,22 +98,28 @@ CREATE TABLE results (
     party INTEGER NOT NULL,
     seats INTEGER NOT NULL,
     seats_percentage INTEGER NOT NULL,
+    votes_percentage INTEGER NOT NULL,
     seats_votes_percentage_difference INTEGER NOT NULL,
     party_winner INTEGER NOT NULL,
     difference_from_winner INTEGER NOT NULL
 );
 
 create view if not exists vpc as
-    select c.votes, p.party_name, con.constituency_name 
+    select c.votes, p.party_id, con.constituency_id 
     from parties p, constituencies con, candidates c  
     where p.party_id = c.party and con.constituency_id = c.constituency;
 
 CREATE VIEW IF NOT EXISTS vpc_winners AS 
-    select max(votes) as votes, party_name, constituency_name
-    from vpc group by constituency_name;
+    select max(votes) as votes, party_id, constituency_id
+    from vpc group by constituency_id;
 
 CREATE VIEW IF NOT EXISTS party_seats as 
-    select party_name, count(*) as seats 
+    select party_id, count(*) as seats 
     from vpc_winners
-    group by party_name
+    group by party_id
     order by seats desc;
+
+CREATE VIEW IF NOT EXISTS party_votes AS
+    select party, sum(votes) as val 
+    from candidates c
+    group by c.party;
