@@ -1,19 +1,4 @@
 ---- tables setup and normalisation
--- drop all tables to ensure everything is built correctly
-drop table if exists candidates; 
-drop table if exists constituencies; 
-drop table if exists counties; 
-drop table if exists regions; 
-drop table if exists countries;
-drop table if exists parties;
-drop table if exists systems;
-drop table if exists results;
-
-drop view if exists vpc;
-drop view if exists vpc_winners;
-drop view if exists party_seats;
-drop view if exists party_votes;
-
 -- location data - creates tables and inserts relevant data from raw results table
 
 CREATE TABLE countries (
@@ -80,18 +65,6 @@ INSERT INTO candidates (firstname, surname, gender, constituency, party, votes)
     INNER JOIN constituencies con ON r.constituency_name = con.constituency_name 
     INNER JOIN parties p ON r.party_name = p.party_name;
 
-CREATE TABLE systems (
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    system_name VARCHAR(500) NOT NULL
-);
-
-INSERT INTO systems (system_name) VALUES 
-    ("First Past the Post"), 
-    ("Proportional Representation"),
-    ("Proportional Representation (5% threshold)"), 
-    ("Largest Remainder"), 
-    ("D'Hondt");
-
 CREATE TABLE results (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     system INTEGER NOT NULL,
@@ -104,22 +77,56 @@ CREATE TABLE results (
     difference_from_winner INTEGER NOT NULL
 );
 
-create view if not exists vpc as
-    select c.votes, p.party_id, con.constituency_id 
-    from parties p, constituencies con, candidates c  
-    where p.party_id = c.party and con.constituency_id = c.constituency;
+-- views - store results of queries without creating real tables
+CREATE VIEW IF NOT EXISTS location_vote_data AS
+select c.votes, 
+        p.party_name, 
+        con.constituency_name, 
+        co.county_name, 
+        r.region_name, 
+        coun.country_name,
+    (select count(*) from constituencies) as number_of_seats ,
+    sum(votes) over(partition by p.party_id) as votes_by_party,
+    sum(votes) over () as total_votes,
+    sum(votes) over(partition by co.county_id) as votes_by_county,
+    sum(votes) over(partition by p.party_id, co.county_id) as votes_by_party_by_county,
+    sum(votes) over(partition by r.region_id) as votes_by_region,
+    sum(votes) over(partition by p.party_id, co.region_id) as votes_by_party_by_region,
+    sum(votes) over(partition by coun.country_id) as votes_by_country,
+    sum(votes) over(partition by p.party_id, coun.country_id) as votes_by_party_by_country
+    from parties         p, 
+        constituencies   con, 
+        candidates       c, 
+        counties         co, 
+        regions          r, 
+        countries        coun
+    where p.party_id = c.party 
+        and con.constituency_id = c.constituency
+        and co.county_id = con.county_id
+        and r.region_id = co.region_id
+        and coun.country_id = r.country_id;
 
-CREATE VIEW IF NOT EXISTS vpc_winners AS 
-    select max(votes) as votes, party_id, constituency_id
-    from vpc group by constituency_id;
+CREATE VIEW IF NOT EXISTS con_winners AS 
+    select max(votes) as votes, party_name, constituency_name
+    from location_vote_data group by constituency_name;
+
+CREATE VIEW IF NOT EXISTS county_winners AS 
+    select max(votes) as votes, party_name, county_name
+    from location_vote_data group by constituency_name;
 
 CREATE VIEW IF NOT EXISTS party_seats as 
-    select party_id, count(*) as seats 
-    from vpc_winners
-    group by party_id
+    select party_name, count(*) as seats 
+    from con_winners
+    group by party_name
     order by seats desc;
 
 CREATE VIEW IF NOT EXISTS party_votes AS
-    select party, sum(votes) as val 
+    select party, sum(votes) as votes
     from candidates c
     group by c.party;
+
+CREATE VIEW IF NOT EXISTS party_votes_threshold AS
+    select party, votes from party_votes
+    where votes > (
+        select cast(sum(votes) / 100.0 as float) * 5.0 
+    from party_votes)

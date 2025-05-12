@@ -7,6 +7,7 @@ pub struct Results {
     pub party: String,
     pub seats: i32,
     pub seats_percentage: i8,
+    pub vote_percentage: i8,
     pub seats_votes_percentage_difference: i16,
     pub party_winner: String,
     pub difference_from_winner: i32,
