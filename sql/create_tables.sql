@@ -80,20 +80,20 @@ CREATE TABLE results (
 -- views - store results of queries without creating real tables
 CREATE VIEW IF NOT EXISTS location_vote_data AS
 select c.votes, 
-        p.party_name, 
+        p.party_name , 
         con.constituency_name, 
         co.county_name, 
         r.region_name, 
         coun.country_name,
-    (select count(*) from constituencies) as number_of_seats ,
-    sum(votes) over(partition by p.party_id) as votes_by_party,
-    sum(votes) over () as total_votes,
-    sum(votes) over(partition by co.county_id) as votes_by_county,
-    sum(votes) over(partition by p.party_id, co.county_id) as votes_by_party_by_county,
-    sum(votes) over(partition by r.region_id) as votes_by_region,
-    sum(votes) over(partition by p.party_id, co.region_id) as votes_by_party_by_region,
-    sum(votes) over(partition by coun.country_id) as votes_by_country,
-    sum(votes) over(partition by p.party_id, coun.country_id) as votes_by_party_by_country
+    (select count(*) from constituencies) as total_seats ,
+    sum(c.votes) over () as total_votes,
+    sum(c.votes) over(partition by p.party_id) as votes_by_party,
+    sum(c.votes) over(partition by co.county_id) as votes_by_county,
+    sum(c.votes) over(partition by p.party_id, co.county_id) as votes_by_party_by_county,
+    sum(c.votes) over(partition by r.region_id) as votes_by_region,
+    sum(c.votes) over(partition by p.party_id, co.region_id) as votes_by_party_by_region,
+    sum(c.votes) over(partition by coun.country_id) as votes_by_country,
+    sum(c.votes) over(partition by p.party_id, coun.country_id) as votes_by_party_by_country
     from parties         p, 
         constituencies   con, 
         candidates       c, 
@@ -114,19 +114,53 @@ CREATE VIEW IF NOT EXISTS county_winners AS
     select max(votes) as votes, party_name, county_name
     from location_vote_data group by constituency_name;
 
+
 CREATE VIEW IF NOT EXISTS party_seats as 
-    select party_name, count(*) as seats 
+    select "fptp" as system, party_name, count(*) as seats 
     from con_winners
     group by party_name
-    order by seats desc;
+    
+union all
+
+select "pr" as system, party_name, 
+            cast((sp.seat_percentage / 100.0) * (select distinct total_seats from location_vote_data)
+                as integer
+            ) as seats 
+            from sp_pr sp
+            where seats > 0
+union all
+
+select "pr_th" as system, party_name, 
+            cast((sp.seat_percentage / 100.0) * (select distinct total_seats from location_vote_data)
+                as integer
+            ) as seats
+            from sp_threshold sp;
 
 CREATE VIEW IF NOT EXISTS party_votes AS
-    select party, sum(votes) as votes
-    from candidates c
-    group by c.party;
+    select p.party_name , sum(c.votes) as votes
+    from candidates c, parties p
+    where c.party = p.party_id
+    group by party_name;
 
 CREATE VIEW IF NOT EXISTS party_votes_threshold AS
-    select party, votes from party_votes
+    select party_name, votes from party_votes
     where votes > (
-        select cast(sum(votes) / 100.0 as float) * 5.0 
-    from party_votes)
+        select cast(sum(votes) / 100.0 as float) * 5
+    from party_votes);
+
+CREATE VIEW IF NOT EXISTS sp_pr AS
+    select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 0) 
+            as seat_percentage from party_votes pv;
+
+CREATE VIEW IF NOT EXISTS vp_pr AS
+   select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 2) 
+            as vote_percentage from party_votes pv;
+
+CREATE VIEW IF NOT EXISTS sp_threshold AS
+    select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 0) 
+            as seat_percentage from party_votes_threshold pv;
+    
+CREATE VIEW IF NOT EXISTS vp_threshold AS
+    select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 2) 
+            as vote_percentage from party_votes_threshold pv;
+        
