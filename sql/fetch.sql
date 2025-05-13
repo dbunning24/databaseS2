@@ -30,14 +30,12 @@ select "First Past the Post" as system,
         from party_votes pv
         ) vp on vp.party_name = p.party_name
         
-    where ps.system = "fptp"
-    order by seats desc;
+    where ps.system = "fptp";
 
 -- Proportional Representation
 select "Proportional Representation" as system, 
         p.party_name as party, 
         ps.seats,
-        sum(ps.seats) over() as total_seats,
         sp.seat_percentage,
         vp.vote_percentage,
         IIF(
@@ -59,8 +57,11 @@ select "Proportional Representation" as system,
         join sp_pr sp on sp.party_name = p.party_name
         join vp_pr vp on vp.party_name = p.party_name
         where ps.system = "pr"
+        and sp.system = "pr"
+        and vp.system = "pr"
         and ps.seats > 0
         order by ps.seats desc;
+  
 
 -- proportional representation with 5% threshold
 select "Proportional Representation with 5% threshold" as system, 
@@ -84,8 +85,10 @@ select "Proportional Representation with 5% threshold" as system,
     from parties p
         join party_votes pv on pv.party_name = p.party_name
         join party_seats ps on ps.party_name = p.party_name
-        join sp_threshold sp on sp.party_name = p.party_name
-        join vp_threshold vp on vp.party_name = p.party_name
-        where system = "pr_th"
+        join sp_pr sp on sp.party_name = p.party_name
+        join vp_pr vp on vp.party_name = p.party_name
+        where ps.system = "pr_th"
+        and sp.system = ps.system
+        and vp.system = ps.system
         order by ps.seats desc;
-        
+

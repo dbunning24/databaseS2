@@ -127,14 +127,68 @@ select "pr" as system, party_name,
                 as integer
             ) as seats 
             from sp_pr sp
-            where seats > 0
+            where seats > 0 and sp.system = system
 union all
 
 select "pr_th" as system, party_name, 
             cast((sp.seat_percentage / 100.0) * (select distinct total_seats from location_vote_data)
                 as integer
             ) as seats
-            from sp_threshold sp;
+            from sp_pr sp
+            where sp.system = system and seats > 0
+            
+union all
+
+select "pr_county" as system, party_name, sum(party_seats_per_county) as seats
+ from (
+    select distinct
+        lvd.party_name, 
+        lvd.county_name,
+        cast((votes_by_party_by_county / cast(votes_by_county as float)) * total.seats as integer) as party_seats_per_county
+        from location_vote_data lvd
+        join (select distinct county_name, 
+            count(distinct constituency_name) as seats
+            from location_vote_data 
+            group by county_name
+        ) total ON total.county_name = lvd.county_name
+) 
+group by party_name
+having seats > 0
+
+union all
+
+select "pr_region" as system, party_name, sum(party_seats_per_region) as seats from (
+    select distinct
+        lvd.party_name, 
+        lvd.region_name,
+        cast((votes_by_party_by_region / cast(votes_by_region as float)) * total.seats as integer) as party_seats_per_region
+        from location_vote_data lvd
+        join (select distinct region_name, 
+            count(distinct constituency_name) as seats
+            from location_vote_data 
+            group by region_name
+        ) total ON total.region_name = lvd.region_name
+) 
+group by party_name
+having seats > 0
+
+union all
+
+select "pr_country" as system, party_name, sum(party_seats_per_country) as seats from (
+    select distinct
+        lvd.party_name, 
+        lvd.country_name,
+        cast((votes_by_party_by_country / cast(votes_by_country as float)) * total.seats as integer) as party_seats_per_country
+        from location_vote_data lvd
+        join (select distinct country_name, 
+            count(distinct constituency_name) as seats
+            from location_vote_data 
+            group by country_name
+        ) total ON total.country_name = lvd.country_name
+) 
+group by party_name
+having seats > 0
+order by seats desc;
 
 CREATE VIEW IF NOT EXISTS party_votes AS
     select p.party_name , sum(c.votes) as votes
@@ -149,18 +203,20 @@ CREATE VIEW IF NOT EXISTS party_votes_threshold AS
     from party_votes);
 
 CREATE VIEW IF NOT EXISTS sp_pr AS
-    select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 0) 
-            as seat_percentage from party_votes pv;
+    select "pr" as system, pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 0) 
+        as seat_percentage from party_votes pv
+            
+    union all
+
+    select "pr_th" as system, pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 0) 
+        as seat_percentage from party_votes_threshold pv
 
 CREATE VIEW IF NOT EXISTS vp_pr AS
-   select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 2) 
-            as vote_percentage from party_votes pv;
+   select "pr" as system, pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 2) 
+        as vote_percentage from party_votes pv
+            
+    union all
 
-CREATE VIEW IF NOT EXISTS sp_threshold AS
-    select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 0) 
-            as seat_percentage from party_votes_threshold pv;
-    
-CREATE VIEW IF NOT EXISTS vp_threshold AS
-    select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 2) 
-            as vote_percentage from party_votes_threshold pv;
-    
+    select "pr_th" as system, pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 2) 
+        as vote_percentage from party_votes_threshold pv
+
