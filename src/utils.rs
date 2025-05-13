@@ -133,5 +133,17 @@ pub async fn setup() -> Pool<Sqlite> {
 
         println!("[#] dropped all tables and views");
     }
+
+    match sqlx::query(include_str!("../sql/create_tables.sql"))
+        .execute(&db)
+        .await
+    {
+        Ok(_) => println!("[+] rebuilt all tables and views"),
+        Err(e) => {
+            eprintln!("[create_tables.sql] ERROR: {e:?}");
+            process::exit(1)
+        }
+    };
+
     db
 }

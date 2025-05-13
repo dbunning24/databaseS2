@@ -164,5 +164,3 @@ CREATE VIEW IF NOT EXISTS vp_threshold AS
     select pv.party_name, round(pv.votes / cast(sum(pv.votes) over() as float) * 100.0, 2) 
             as vote_percentage from party_votes_threshold pv;
     
-
-DROP TABLE IF EXISTS election_results_raw;

@@ -18,17 +18,6 @@ async fn main() {
     // db setup
     let db = setup().await;
 
-    match sqlx::query(include_str!("../sql/create_tables.sql"))
-        .execute(&db)
-        .await
-    {
-        Ok(_) => println!("[+] rebuilt all tables and views"),
-        Err(e) => {
-            eprintln!("[create_tables.sql] ERROR: {e:?}");
-            process::exit(1)
-        }
-    };
-
     // FPTP by Constituency
     let first_past_post = match sqlx::query(include_str!("../sql/fetch.sql"))
         .fetch_all(&db)
