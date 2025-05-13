@@ -38,11 +38,24 @@ pub async fn setup() -> Pool<Sqlite> {
     } else {
         println!("[+] found database, no reconstruction needed");
         println!(
-            "[MESSAGE] if the db is here but the `election_results_raw` table is not present or malformed, please delete `sqlite.db` and restart the application"
+            "[MESSAGE] if `election_results_raw` is malformed, please delete `sqlite.db` and restart the application"
         )
     }
 
     let db = SqlitePool::connect(DB_URL).await.unwrap();
+    match sqlx::query("SELECT name FROM sqlite_master;")
+        .fetch_all(&db)
+        .await
+    {
+        Ok(r) => {
+            let names: Vec<&str> = r.iter().map(|r| r.get("name")).collect();
+            if !names.contains(&"election_results_raw") {
+                println!("[!] raw data table not found. reconstruction neeeded.");
+                raw_data_present = false;
+            }
+        }
+        Err(_) => (),
+    }
 
     // if the raw data table is gone for some reason, reconstruct using csv data
     if (!raw_data_present) {
