@@ -31,10 +31,23 @@ async fn main() {
             ),
         }
     } else {
-        println!("[+] found database");
+        println!("[+] found database, no reconstruction needed");
     }
     // connect to the database and run table creation script
     let db = SqlitePool::connect(DB_URL).await.unwrap();
+    match sqlx::query("SELECT name FROM sqlite_master;")
+        .fetch_all(&db)
+        .await
+    {
+        Ok(r) => {
+            let names: Vec<&str> = r.iter().map(|r| r.get("name")).collect();
+            if !names.contains(&"election_results_raw") {
+                println!("[!] raw data table not found. reconstruction neeeded.");
+                raw_data_present = false;
+            }
+        }
+        Err(_) => (),
+    }
 
     // if the raw data table is gone for some reason, reconstruct using csv data
     if (!raw_data_present) {
@@ -109,7 +122,7 @@ async fn main() {
                         .execute(&db)
                         .await
                     {
-                        Ok(_) => println!("[+] dropped {} {}", r#type, name),
+                        Ok(_) => (),
                         Err(e) => {
                             eprintln!("[table/view dropping] ERROR: {e:?}");
                             process::exit(1)
@@ -123,7 +136,7 @@ async fn main() {
             }
         };
 
-        println!("[#] dropped tables and views");
+        println!("[#] dropped all tables and views");
     }
     match sqlx::query(include_str!("../sql/create_tables.sql"))
         .execute(&db)
