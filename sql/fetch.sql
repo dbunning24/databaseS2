@@ -6,8 +6,8 @@ select "First Past the Post" as system,
         vp.vote_percentage,
         IIF(
             sp.seat_percentage < vp.vote_percentage, 
-            "-"|| vp.vote_percentage - sp.seat_percentage, 
-            "+" || sp.seat_percentage - vp.vote_percentage
+            "-"|| round(vp.vote_percentage - sp.seat_percentage, 2), 
+            "+" || round(sp.seat_percentage - vp.vote_percentage,2)
         ) as [difference between percentage of votes and seats],
         (select p.party_name from 
             parties p, 
@@ -36,12 +36,12 @@ select "First Past the Post" as system,
 select "Proportional Representation" as system, 
         p.party_name as party, 
         ps.seats,
-        sp.seat_percentage,
+        ps.seat_percentage,
         vp.vote_percentage,
         IIF(
-            sp.seat_percentage < vp.vote_percentage, 
-            "-" || round(vp.vote_percentage - sp.seat_percentage, 2),
-            "+" || round(sp.seat_percentage - vp.vote_percentage, 2)
+            ps.seat_percentage < vp.vote_percentage, 
+            "-" || round(vp.vote_percentage - ps.seat_percentage, 2),
+            "+" || round(ps.seat_percentage - vp.vote_percentage, 2)
         ) as [difference between percentage of votes and seats],
         (select p.party_name from 
             parties p, 
@@ -53,7 +53,6 @@ select "Proportional Representation" as system,
         max(ps.seats) over() - ps.seats as [seat difference from winner]
     from parties p
         join party_seats ps on ps.party_name = p.party_name
-        join sp_pr sp on sp.party_name = p.party_name
         join vp_pr vp on vp.party_name = p.party_name
         where ps.system = "pr"
         and ps.seats > 0
@@ -64,12 +63,12 @@ select "Proportional Representation" as system,
 select "Proportional Representation with 5% threshold" as system, 
         p.party_name as party, 
         ps.seats,
-        sp.seat_percentage,
+        ps.seat_percentage,
         vp.vote_percentage,
         IIF(
-            sp.seat_percentage < vp.vote_percentage, 
-            "-" || round(vp.vote_percentage - sp.seat_percentage, 2),
-            "+" || round(sp.seat_percentage - vp.vote_percentage, 2)
+            ps.seat_percentage < vp.vote_percentage, 
+            "-" || round(vp.vote_percentage - ps.seat_percentage, 2),
+            "+" || round(ps.seat_percentage - vp.vote_percentage, 2)
         ) as [difference between percentage of votes and seats],
         (select p.party_name from 
             parties p, 
@@ -81,7 +80,6 @@ select "Proportional Representation with 5% threshold" as system,
         max(ps.seats) over() - ps.seats as [seat difference from winner]
     from parties p
         join party_seats ps on ps.party_name = p.party_name
-        join sp_threshold sp on sp.party_name = p.party_name
         join vp_threshold vp on vp.party_name = p.party_name
         where ps.system = "pr_th"
         order by ps.seats desc;
@@ -89,12 +87,12 @@ select "Proportional Representation with 5% threshold" as system,
 select "Proportional Representation (county)" as system, 
         p.party_name as party, 
         ps.seats,
-        sp.seat_percentage,
+        ps.seat_percentage,
         vp.vote_percentage,
         IIF(
-            sp.seat_percentage < vp.vote_percentage, 
-            "-" || round(vp.vote_percentage - sp.seat_percentage, 2),
-            "+" || round(sp.seat_percentage - vp.vote_percentage, 2)
+            ps.seat_percentage < vp.vote_percentage, 
+            "-" || round(vp.vote_percentage - ps.seat_percentage, 2),
+            "+" || round(ps.seat_percentage - vp.vote_percentage, 2)
         ) as [difference between percentage of votes and seats],
         (select p.party_name from 
             parties p, 
@@ -106,7 +104,6 @@ select "Proportional Representation (county)" as system,
         max(ps.seats) over() - ps.seats as [seat difference from winner]
     from parties p
         join party_seats ps on ps.party_name = p.party_name
-        join sp_pr sp on sp.party_name = p.party_name
         join vp_pr vp on vp.party_name = p.party_name
         where ps.system = "pr_county"
         and ps.seats > 0
@@ -115,12 +112,12 @@ select "Proportional Representation (county)" as system,
 select "Proportional Representation (region)" as system, 
         p.party_name as party, 
         ps.seats,
-        sp.seat_percentage,
+        ps.seat_percentage,
         vp.vote_percentage,
         IIF(
-            sp.seat_percentage < vp.vote_percentage, 
-            "-" || round(vp.vote_percentage - sp.seat_percentage, 2),
-            "+" || round(sp.seat_percentage - vp.vote_percentage, 2)
+            ps.seat_percentage < vp.vote_percentage, 
+            "-" || round(vp.vote_percentage - ps.seat_percentage, 2),
+            "+" || round(ps.seat_percentage - vp.vote_percentage, 2)
         ) as [difference between percentage of votes and seats],
         (select p.party_name from 
             parties p, 
@@ -132,9 +129,32 @@ select "Proportional Representation (region)" as system,
         max(ps.seats) over() - ps.seats as [seat difference from winner]
     from parties p
         join party_seats ps on ps.party_name = p.party_name
-        join sp_pr sp on sp.party_name = p.party_name
         join vp_pr vp on vp.party_name = p.party_name
         where ps.system = "pr_region"
         and ps.seats > 0
         order by ps.seats desc;
 
+select "Proportional Representation (country)" as system, 
+        p.party_name as party, 
+        ps.seats,
+        ps.seat_percentage,
+        vp.vote_percentage,
+        IIF(
+            ps.seat_percentage < vp.vote_percentage, 
+            "-" || round(vp.vote_percentage - ps.seat_percentage, 2),
+            "+" || round(ps.seat_percentage - vp.vote_percentage, 2)
+        ) as [difference between percentage of votes and seats],
+        (select p.party_name from 
+            parties p, 
+            (select party_name, max(seats) 
+                from party_seats where system = "pr_country"
+            ) w 
+            where p.party_name = w.party_name
+        ) as [winning party],
+        max(ps.seats) over() - ps.seats as [seat difference from winner]
+    from parties p
+        join party_seats ps on ps.party_name = p.party_name
+        join vp_pr vp on vp.party_name = p.party_name
+        where ps.system = "pr_country"
+        and ps.seats > 0
+        order by ps.seats desc;

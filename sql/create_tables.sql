@@ -110,13 +110,8 @@ CREATE VIEW IF NOT EXISTS con_winners AS
     select max(votes) as votes, party_name, constituency_name
     from location_vote_data group by constituency_name;
 
-CREATE VIEW IF NOT EXISTS county_winners AS 
-    select max(votes) as votes, party_name, county_name
-    from location_vote_data group by constituency_name;
-
-
 CREATE VIEW IF NOT EXISTS party_seats as 
-    select "fptp" as system, party_name, count(*) as seats , ps.seats / cast(sum(ps.seats) over() as float) * 100.0 as seat_percentage
+  select "fptp" as system, party_name, count(*) as seats, round(count(*) / cast(sum(count(*)) over() as float) * 100.0, 2) as seat_percentage
     from con_winners
     group by party_name
     
@@ -126,7 +121,7 @@ select "pr" as system, party_name,
             cast((sp.seat_percentage / 100.0) * (select distinct total_seats from location_vote_data)
                 as integer
             ) as seats,
-            sp.seat_percentage
+            round(sp.seat_percentage, 2)
             from (select pv.party_name, pv.votes / cast(sum(pv.votes) over() as float) * 100.0 as seat_percentage from party_votes pv) sp
             where seats > 0
             and sp.party_name = party_name
@@ -136,34 +131,33 @@ select "pr_th" as system, party_name,
             cast((sp.seat_percentage / 100.0) * (select distinct total_seats from location_vote_data)
                 as integer
             ) as seats,
-            sp.seat_percentage
+            round(sp.seat_percentage, 2)
             from (select pv.party_name, pv.votes / cast(sum(pv.votes) over() as float) * 100.0 as seat_percentage from party_votes_threshold pv) sp
             where seats > 0
             and sp.party_name = party_name
             
 union all
--- UNFINSIHED - make the rest of the the thingies the same and calculate seat percentages for the rest of the systems
-select "pr_county" as system, party_name, sum(party_seats_per_county) as seats
+-- UNFINSIHED - calculate seat percentages for the rest of the systems
+select "pr_county" as system, party_name, sum(party_seats_per_county) as seats, round(sum(party_seats_per_county) / cast((select distinct total_seats from location_vote_data) as float) * 100, 2) as seat_percentage
  from (
     select distinct
         lvd.party_name, 
         lvd.county_name,
-        cast((votes_by_party_by_county / cast(votes_by_county as float)) * total.seats as integer) as party_seats_per_county,
-        votes_by_party_by_county / cast(votes_by_county as float) as seat_percentage
-        
+        cast((votes_by_party_by_county / cast(votes_by_county as float)) * total.seats as integer) as party_seats_per_county
         from location_vote_data lvd
         join (select distinct county_name, 
             count(distinct constituency_name) as seats
             from location_vote_data 
             group by county_name
         ) total ON total.county_name = lvd.county_name
-) 
+)
 group by party_name
-having seats > 0
+having seats > 0 and seat_percentage > 0
 
 union all
 
-select "pr_region" as system, party_name, sum(party_seats_per_region) as seats from (
+select "pr_region" as system, party_name, sum(party_seats_per_region) as seats, round(sum(party_seats_per_region) / cast((select distinct total_seats from location_vote_data) as float) * 100) as seat_percentage 
+from (
     select distinct
         lvd.party_name, 
         lvd.region_name,
@@ -174,13 +168,14 @@ select "pr_region" as system, party_name, sum(party_seats_per_region) as seats f
             from location_vote_data 
             group by region_name
         ) total ON total.region_name = lvd.region_name
-) 
+)
 group by party_name
-having seats > 0
+having seats > 0 and seat_percentage > 0
 
 union all
 
-select "pr_country" as system, party_name, sum(party_seats_per_country) as seats from (
+select "pr_country" as system, party_name, sum(party_seats_per_country) as seats, round(sum(party_seats_per_country) / cast((select distinct total_seats from location_vote_data) as float) * 100, 2) as seat_percentage
+from (
     select distinct
         lvd.party_name, 
         lvd.country_name,
@@ -191,9 +186,9 @@ select "pr_country" as system, party_name, sum(party_seats_per_country) as seats
             from location_vote_data 
             group by country_name
         ) total ON total.country_name = lvd.country_name
-) 
+)
 group by party_name
-having seats > 0
+having seats > 0 and seat_percentage > 0
 order by seats desc;
 
 
@@ -209,18 +204,11 @@ CREATE VIEW IF NOT EXISTS party_votes_threshold AS
         select cast(sum(votes) / 100.0 as float) * 5.0 
     from party_votes);
 
-CREATE VIEW IF NOT EXISTS sp_pr AS
-    select pv.party_name, pv.votes / cast(sum(pv.votes) over() as float) * 100.0 
-            as seat_percentage from party_votes pv;
 
 CREATE VIEW IF NOT EXISTS vp_pr AS
    select pv.party_name, pv.votes / cast(sum(pv.votes) over() as float) * 100.0 
             as vote_percentage from party_votes pv;
 
-CREATE VIEW IF NOT EXISTS sp_threshold AS
-    select pv.party_name, pv.votes / cast(sum(pv.votes) over() as float) * 100.0
-            as seat_percentage from party_votes_threshold pv;
-    
 CREATE VIEW IF NOT EXISTS vp_threshold AS
     select pv.party_name, pv.votes / cast(sum(pv.votes) over() as float) * 100.0
             as vote_percentage from party_votes_threshold pv;
