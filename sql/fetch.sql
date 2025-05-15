@@ -18,12 +18,8 @@ select "First Past the Post" as system,
         ) as [winning party],
         max(ps.seats) over() - ps.seats as [seat difference from winner]
     from parties p
-    join party_votes pv on pv.party_name = p.party_name
     join party_seats ps on ps.party_name = p.party_name
-    join (select pv.party_name, 
-            pv.votes / cast(sum(pv.votes) over() as float) * 100.0 as vote_percentage 
-        from party_votes pv
-        ) vp on vp.party_name = p.party_name
+    join vp on vp.party_name = p.party_name
     where ps.system = "fptp"
     order by seats desc;
     
@@ -48,7 +44,7 @@ select "Proportional Representation" as system,
         max(ps.seats) over() - ps.seats as [seat difference from winner]
     from parties p
         join party_seats ps on ps.party_name = p.party_name
-        join vp_pr vp on vp.party_name = p.party_name
+        join vp on vp.party_name = p.party_name
         where ps.system = "pr"
         and ps.seats > 0
         order by ps.seats desc;
@@ -74,7 +70,9 @@ select "Proportional Representation with 5% threshold" as system,
         max(ps.seats) over() - ps.seats as [seat difference from winner]
     from parties p
         join party_seats ps on ps.party_name = p.party_name
-        join vp_threshold vp on vp.party_name = p.party_name
+        join (
+            select pv.party_name, pv.votes / cast(sum(pv.votes) over() as float) * 100.0 as vote_percentage from party_votes_threshold pv
+        ) vp on vp.party_name = p.party_name
         where ps.system = "pr_th"
         order by ps.seats desc;
 
@@ -98,7 +96,11 @@ select "Proportional Representation (county)" as system,
         max(ps.seats) over() - ps.seats as [seat difference from winner] 
     from parties p
         join party_seats ps on ps.party_name = p.party_name
-        join vp_pr vp on vp.party_name = p.party_name
+        join (select party_name, 
+            round(county_vote_percentage * 100, 2) as vote_percentage 
+            from location_vote_data 
+            group by party_name 
+        ) vp on vp.party_name = p.party_name
         where ps.system = "pr_county"
         and ps.seats > 0
         order by ps.seats desc;
