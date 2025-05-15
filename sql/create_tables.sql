@@ -88,12 +88,20 @@ select c.votes,
     (select count(*) from constituencies) as total_seats ,
     sum(c.votes) over () as total_votes,
     sum(c.votes) over(partition by p.party_id) as votes_by_party,
+    sum(c.votes) over(partition by p.party_id) / cast(sum(c.votes) over() as float) as total_vote_percentage,
+    
     sum(c.votes) over(partition by co.county_id) as votes_by_county,
     sum(c.votes) over(partition by p.party_id, co.county_id) as votes_by_party_by_county,
+    sum(c.votes) over(partition by p.party_id, co.county_id) / cast(sum(c.votes) over(partition by co.county_id) as float) as county_vote_percentage,
+    
     sum(c.votes) over(partition by r.region_id) as votes_by_region,
-    sum(c.votes) over(partition by p.party_id, co.region_id) as votes_by_party_by_region,
+    sum(c.votes) over(partition by p.party_id, r.region_id) as votes_by_party_by_region,
+    sum(c.votes) over(partition by p.party_id, r.region_id) / cast(sum(c.votes) over(partition by r.region_id) as float) as region_vote_percentage,
+    
     sum(c.votes) over(partition by coun.country_id) as votes_by_country,
-    sum(c.votes) over(partition by p.party_id, coun.country_id) as votes_by_party_by_country
+    sum(c.votes) over(partition by p.party_id, coun.country_id) as votes_by_party_by_country,
+    sum(c.votes) over(partition by p.party_id, coun.country_id) / cast(sum(c.votes) over(partition by coun.country_id) as float) as country_vote_percentage
+    
     from parties         p, 
         constituencies   con, 
         candidates       c, 
@@ -191,18 +199,16 @@ group by party_name
 having seats > 0 and seat_percentage > 0
 order by seats desc;
 
-
 CREATE VIEW IF NOT EXISTS party_votes AS
-    select p.party_name , sum(c.votes) as votes
-    from candidates c, parties p
-    where c.party = p.party_id
+    select party_name, votes_by_party
+    from location_vote_data
     group by party_name;
 
 CREATE VIEW IF NOT EXISTS party_votes_threshold AS
-    select party_name, votes from party_votes
-    where votes > (
-        select cast(sum(votes) / 100.0 as float) * 5.0 
-    from party_votes);
+    select party_name, votes_by_party 
+    from location_vote_data
+    where total_vote_percentage > 0.05
+    group by party_name;
 
 
 CREATE VIEW IF NOT EXISTS vp_pr AS
