@@ -1,36 +1,5 @@
 -- views - store results of queries without creating real tables
-CREATE VIEW IF NOT EXISTS location_vote_data AS
-select c.votes, 
-        p.party_name , 
-        con.constituency_name, 
-        co.county_name, 
-        r.region_name, 
-        coun.country_name,
-    (select count(*) from constituencies) as total_seats ,
-    sum(c.votes) over () as total_votes,
-    sum(c.votes) over(partition by p.party_id) as votes_by_party,
-    sum(c.votes) over(partition by p.party_id) / cast(sum(c.votes) over() as float) as total_vote_percentage,
-    
-    sum(c.votes) over(partition by co.county_id) as votes_by_county,
-    sum(c.votes) over(partition by p.party_id, co.county_id) as votes_by_party_by_county,
-    
-    sum(c.votes) over(partition by r.region_id) as votes_by_region,
-    sum(c.votes) over(partition by p.party_id, r.region_id) as votes_by_party_by_region,
-    
-    sum(c.votes) over(partition by coun.country_id) as votes_by_country,
-    sum(c.votes) over(partition by p.party_id, coun.country_id) as votes_by_party_by_country
-    
-    from parties         p, 
-        constituencies   con, 
-        candidates       c, 
-        counties         co, 
-        regions          r, 
-        countries        coun
-    where p.party_id = c.party 
-        and con.constituency_id = c.constituency
-        and co.county_id = con.county_id
-        and r.region_id = co.region_id
-        and coun.country_id = r.country_id;
+
 
 
 CREATE VIEW IF NOT EXISTS party_seats as 
@@ -139,6 +108,15 @@ from (
 )
 group by party_name
 having seats > 0 and seat_percentage > 0
+
+
+union all
+
+select "lr_county" as system, party_name, sum(updated_seats) as seats, seat_percentage, vote_percentage
+from lr_results
+where level = "county"
+group by party_name
+having seats > 0 and seat_percentage > 0
 order by seats desc;
 
 CREATE VIEW IF NOT EXISTS party_votes AS
@@ -152,7 +130,6 @@ CREATE VIEW IF NOT EXISTS party_votes_threshold AS
     where total_vote_percentage > 0.05
     group by party_name;
 
-
 CREATE VIEW IF NOT EXISTS vp AS
     select party_name, 
         round(total_vote_percentage * 100, 2) as vote_percentage 
@@ -160,22 +137,3 @@ CREATE VIEW IF NOT EXISTS vp AS
         where vote_percentage > 0
         group by party_name;
 
-CREATE VIEW IF NOT EXISTS loc_seats AS
-    select distinct county_name as name, "county" as level,
-        count(distinct constituency_name) as seats 
-        from location_vote_data 
-        group by county_name
-
-    union all
-
-    select distinct region_name as name, "region" as level,
-        count(distinct constituency_name) as seats 
-        from location_vote_data 
-        group by region_name
-        
-    union all
-        
-    select distinct country_name as name, "country" as level,
-        count(distinct constituency_name) as seats 
-        from location_vote_data 
-        group by country_name;

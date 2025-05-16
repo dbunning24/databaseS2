@@ -154,7 +154,7 @@ pub async fn setup() -> Pool<Sqlite> {
         println!("[#] dropped all tables and views");
     }
 
-    match sqlx::query(include_str!("../sql/create_tables.sql"))
+    match sqlx::query(include_str!("../sql/create_tables_1.sql"))
         .execute(&db)
         .await
     {
@@ -165,7 +165,9 @@ pub async fn setup() -> Pool<Sqlite> {
         }
     };
 
-    match sqlx::query(include_str!("../sql/create_views.sql"))
+    calculate_lr_data(&db).await;
+
+    match sqlx::query(include_str!("../sql/create_tables_2.sql"))
         .execute(&db)
         .await
     {
@@ -177,4 +179,61 @@ pub async fn setup() -> Pool<Sqlite> {
     };
 
     db
+}
+
+async fn calculate_lr_data(db: &Pool<Sqlite>) {
+
+    // get all counties
+    let mut counties: Vec<String> = Vec::new();
+    match sqlx::query("select county_name from counties").fetch_all(db).await {
+        Ok(e) => {
+            for row in &e {
+                let county: &str = row.get("county_name");
+                counties.push(county.to_string());
+            }
+        }
+        Err(_) => ()
+    }
+
+    // iterate over counties and perform calculations
+    for county in counties {
+        match sqlx::query("select * from lr_results where county_name = $1").bind(&county).fetch_all(db).await {
+            Ok(e) => {
+                let mut res: Vec<LrSetupRes> = Vec::new();
+                let mut remaining_seats = 0;
+                for row in &e {
+                    res.push( 
+                        LrSetupRes { 
+                            party_name: row.get::<&str, &str>("party_name").to_string(),
+                            county_name: row.get::<&str, &str>("county_name").to_string(), 
+                            seats: row.get::<i32, &str>("seats")
+                        }
+                    );
+                    remaining_seats = row.get("remaining_seats");
+                }
+                //println!("{res:#?}");
+                let mut cursor = 0;
+                while remaining_seats > 0 {
+                    if cursor >= res.len() {cursor = 0}
+                    res.get_mut(cursor).unwrap().seats += 1;
+                    cursor += 1;
+                    remaining_seats -= 1;
+                }
+                for val in &res {
+                    sqlx::query("
+                        update lr_results set updated_seats = $1 where party_name = $2 and county_name = $3;
+                        update lr_results set seat_percentage = (updated_seats / cast(county_seats as float)) * 100 where party_name = $2 and county_name = $3;")
+                        .bind(&val.seats)
+                        .bind(&val.party_name)
+                        .bind(&val.county_name)
+                        .execute(db).await.unwrap();
+                }
+
+            } 
+            Err(_) => ()
+        }
+    }
+
+    println!("[calculate lr data] largest remainder data calculated")
+
 }
