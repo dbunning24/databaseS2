@@ -18,6 +18,13 @@ pub struct Results {
     pub difference_from_winner: i32,
 }
 
+#[derive(FromRow, Debug, Clone)]
+pub struct LrSetupRes {
+    pub party_name: String,
+    pub county_name: String,
+    pub seats: i32
+}
+
 const DB_URL: &'static str = "sqlite://sqlite.db";
 
 pub async fn setup() -> Pool<Sqlite> {
@@ -151,9 +158,20 @@ pub async fn setup() -> Pool<Sqlite> {
         .execute(&db)
         .await
     {
-        Ok(_) => println!("[+] rebuilt all tables and views"),
+        Ok(_) => println!("[+] rebuilt all tables"),
         Err(e) => {
             eprintln!("[create_tables.sql] ERROR: {e:?}");
+            process::exit(1)
+        }
+    };
+
+    match sqlx::query(include_str!("../sql/create_views.sql"))
+        .execute(&db)
+        .await
+    {
+        Ok(_) => println!("[+] rebuilt all views"),
+        Err(e) => {
+            eprintln!("[create_views.sql] ERROR: {e:?}");
             process::exit(1)
         }
     };
