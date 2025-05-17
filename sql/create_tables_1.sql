@@ -134,27 +134,83 @@ CREATE VIEW IF NOT EXISTS loc_seats AS
 CREATE TABLE IF NOT EXISTS lr_results AS
     select "county" as level,
         party_name, 
-        county_name,
+        loc_name,
         dec_seats, 
         cast(dec_seats as integer) as seats, 
         dec_seats - cast(dec_seats as integer) as remainder,
-        sum(cast(dec_seats as integer)) over(partition by county_name) as allocated_seats,
-        county_seats - sum(cast(dec_seats as integer)) over(partition by county_name) as remaining_seats,
-        county_seats,
+        sum(cast(dec_seats as integer)) over(partition by loc_name) as allocated_seats,
+        loc_seats - sum(cast(dec_seats as integer)) over(partition by loc_name) as remaining_seats,
+        loc_seats,
         0 as updated_seats,
         0 as seat_percentage,
         (votes_by_party_by_county / cast(votes_by_county as float)) *  100 as vote_percentage
     from (
         select distinct lvd.party_name, 
-            ls.name as county_name, 
+            ls.name as loc_name, 
             lvd.votes_by_county,
             lvd.votes_by_party_by_county,
-            ls.seats as county_seats, 
+            ls.seats as loc_seats, 
             lvd.votes_by_county / cast(ls.seats as float) as quota,
             lvd.votes_by_party_by_county / (lvd.votes_by_county / cast(ls.seats as float)) as dec_seats
         from location_vote_data lvd
         join loc_seats ls where ls.name = lvd.county_name
         order by ls.name
     )
-group by county_name, party_name
-order by county_name, remainder desc;
+group by loc_name, party_name
+
+union all
+
+select "region" as level,
+        party_name, 
+        loc_name,
+        dec_seats, 
+        cast(dec_seats as integer) as seats, 
+        dec_seats - cast(dec_seats as integer) as remainder,
+        sum(cast(dec_seats as integer)) over(partition by loc_name) as allocated_seats,
+        loc_seats - sum(cast(dec_seats as integer)) over(partition by loc_name) as remaining_seats,
+        loc_seats,
+        0 as updated_seats,
+        0 as seat_percentage,
+        (votes_by_party_by_region / cast(votes_by_region as float)) *  100 as vote_percentage
+    from (
+        select distinct lvd.party_name, 
+            ls.name as loc_name, 
+            lvd.votes_by_region,
+            lvd.votes_by_party_by_region,
+            ls.seats as loc_seats, 
+            lvd.votes_by_region / cast(ls.seats as float) as quota,
+            lvd.votes_by_party_by_region / (lvd.votes_by_region / cast(ls.seats as float)) as dec_seats
+        from location_vote_data lvd
+        join loc_seats ls where ls.name = lvd.region_name
+        order by ls.name
+    )
+group by loc_name, party_name
+
+union all
+
+select "country" as level,
+        party_name, 
+        loc_name,
+        dec_seats, 
+        cast(dec_seats as integer) as seats, 
+        dec_seats - cast(dec_seats as integer) as remainder,
+        sum(cast(dec_seats as integer)) over(partition by loc_name) as allocated_seats,
+        loc_seats - sum(cast(dec_seats as integer)) over(partition by loc_name) as remaining_seats,
+        loc_seats,
+        0 as updated_seats,
+        0 as seat_percentage,
+        (votes_by_party_by_country / cast(votes_by_country as float)) *  100 as vote_percentage
+    from (
+        select distinct lvd.party_name, 
+            ls.name as loc_name, 
+            lvd.votes_by_country,
+            lvd.votes_by_party_by_country,
+            ls.seats as loc_seats, 
+            lvd.votes_by_country / cast(ls.seats as float) as quota,
+            lvd.votes_by_party_by_country / (lvd.votes_by_country / cast(ls.seats as float)) as dec_seats
+        from location_vote_data lvd
+        join loc_seats ls where ls.name = lvd.country_name
+        order by ls.name
+    )
+group by loc_name, party_name
+order by loc_name, remainder desc;

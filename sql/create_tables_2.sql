@@ -1,7 +1,5 @@
 -- views - store results of queries without creating real tables
 
-
-
 CREATE VIEW IF NOT EXISTS party_seats as 
   select "fptp" as system, 
     sp.party_name, sp.seats, 
