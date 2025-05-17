@@ -1,3 +1,4 @@
+INSERT INTO results 
 select "Largest Remainder (county)" as system, 
         p.party_name as party, 
         ps.seats,

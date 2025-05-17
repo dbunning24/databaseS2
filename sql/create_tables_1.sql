@@ -65,18 +65,6 @@ INSERT INTO candidates (firstname, surname, gender, constituency, party, votes)
     INNER JOIN constituencies con ON r.constituency_name = con.constituency_name 
     INNER JOIN parties p ON r.party_name = p.party_name;
 
-CREATE TABLE results (
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    system INTEGER NOT NULL,
-    party INTEGER NOT NULL,
-    seats INTEGER NOT NULL,
-    seats_percentage INTEGER NOT NULL,
-    votes_percentage INTEGER NOT NULL,
-    seats_votes_percentage_difference INTEGER NOT NULL,
-    party_winner INTEGER NOT NULL,
-    difference_from_winner INTEGER NOT NULL
-);
-
 CREATE VIEW IF NOT EXISTS location_vote_data AS
 select c.votes, 
         p.party_name , 
@@ -214,3 +202,47 @@ select "country" as level,
     )
 group by loc_name, party_name
 order by loc_name, remainder desc;
+
+CREATE TABLE IF NOT EXISTS dh_results AS
+    select "county" as level, w.*, ls.seats as loc_seats from (
+        select distinct 
+            party_name, 
+            county_name as loc_name, 
+            votes_by_party_by_county as votes,
+            0 as seats
+        from location_vote_data 
+    ) w
+    join loc_seats ls on ls.name = loc_name
+
+union all 
+
+    select "region" as level, w.*, ls.seats as loc_seats from (
+        select distinct 
+            party_name, 
+            region_name as loc_name, 
+            votes_by_party_by_region as votes,
+            0 as seats
+        from location_vote_data 
+    ) w
+    join loc_seats ls on ls.name = loc_name
+
+union all 
+
+    select "country" as level, w.*, ls.seats as loc_seats from (
+        select distinct 
+            party_name, 
+            country_name as loc_name, 
+            votes_by_party_by_country as votes,
+            0 as seats
+        from location_vote_data 
+    ) w
+    join loc_seats ls on ls.name = loc_name
+
+    order by loc_name desc;
+
+CREATE VIEW IF NOT EXISTS dh_quot AS
+    select level, 
+    party_name, 
+    loc_name, 
+    max(votes / cast(seats + 1 as float)) as quot 
+    from dh_results group by loc_name, level;

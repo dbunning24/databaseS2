@@ -6,23 +6,24 @@ use std::{
     io::BufReader,
     process,
 };
-#[derive(FromRow, Debug, Clone)]
-pub struct Results {
-    pub system: String,
-    pub party: String,
-    pub seats: i32,
-    pub seats_percentage: i8,
-    pub vote_percentage: i8,
-    pub seats_votes_percentage_difference: i16,
-    pub party_winner: String,
-    pub difference_from_winner: i32,
-}
+
+use crate::calculate::*;
 
 #[derive(FromRow, Debug, Clone)]
 pub struct LrSetupRes {
     pub party_name: String,
     pub loc_name: String,
     pub seats: i32,
+}
+
+#[derive(FromRow, Debug, Clone)]
+pub struct DhSetupRes {
+    pub level: String,
+    pub party_name: String,
+    pub loc_name: String,
+    pub votes: i32,
+    pub seats: i32,
+    pub loc_seats: i32,
 }
 
 const DB_URL: &'static str = "sqlite://sqlite.db";
@@ -50,6 +51,32 @@ pub async fn setup() -> Pool<Sqlite> {
     }
 
     let db = SqlitePool::connect(DB_URL).await.unwrap();
+    // get all counties, regions, and countries
+
+    let mut counties: Vec<String> = sqlx::query("select county_name from counties")
+        .fetch_all(&db)
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get::<String, &str>("county_name"))
+        .collect();
+    let mut regions: Vec<String> = sqlx::query("select region_name from regions")
+        .fetch_all(&db)
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get::<String, &str>("region_name"))
+        .collect();
+    let mut countries: Vec<String> = sqlx::query("select country_name from countries")
+        .fetch_all(&db)
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get::<String, &str>("country_name"))
+        .collect();
+    let mut levels: Vec<Vec<String>> = vec![counties, regions, countries];
+    let mut level_names: Vec<String> = vec!["county".into(), "region".into(), "country".into()];
+
     match sqlx::query("SELECT name FROM sqlite_master;")
         .fetch_all(&db)
         .await
@@ -118,147 +145,66 @@ pub async fn setup() -> Pool<Sqlite> {
                 panic!("couldnt create raw data. exiting...");
             }
         }
-    } else {
-        // drop all tables and views automatically to save me doing it myself
-        match sqlx::query(
-            "SELECT name, type
+    }
+
+    // drop all tables and views automatically to save me doing it myself
+    match sqlx::query(
+        "SELECT name, type
             FROM sqlite_master WHERE (type='table' OR type='view') 
             AND name != 'election_results_raw' 
             AND name NOT LIKE 'sqlite_%';",
-        )
-        .fetch_all(&db)
-        .await
-        {
-            Ok(res) => {
-                for row in res {
-                    let (name, r#type): (&str, &str) = (row.get("name"), row.get("type"));
+    )
+    .fetch_all(&db)
+    .await
+    {
+        Ok(res) => {
+            for row in res {
+                let (name, r#type): (&str, &str) = (row.get("name"), row.get("type"));
 
-                    let _ = match sqlx::query(format!("drop {type} if exists {name}").as_str())
-                        .execute(&db)
-                        .await
-                    {
-                        Ok(_) => (),
-                        Err(e) => {
-                            eprintln!("[table/view dropping] ERROR: {e:?}");
-                            process::exit(1)
-                        }
-                    };
-                }
+                let _ = match sqlx::query(format!("drop {type} if exists {name}").as_str())
+                    .execute(&db)
+                    .await
+                {
+                    Ok(_) => (),
+                    Err(e) => {
+                        eprintln!("[table/view dropping] ERROR: {e:?}");
+                        process::exit(1)
+                    }
+                };
             }
-            Err(e) => {
-                eprintln!("[database cleanup] ERROR: {e:?}");
-                process::exit(1)
-            }
-        };
+        }
+        Err(e) => {
+            eprintln!("[database cleanup] ERROR: {e:?}");
+            process::exit(1)
+        }
+    };
 
-        println!("[#] dropped all tables and views");
-    }
+    println!("[#] dropped all tables and views");
 
     match sqlx::query(include_str!("../sql/create_tables_1.sql"))
         .execute(&db)
         .await
     {
-        Ok(_) => println!("[+] rebuilt all tables"),
+        Ok(_) => println!("[+] rebuilt first half of tables/views"),
         Err(e) => {
-            eprintln!("[create_tables.sql] ERROR: {e:?}");
+            eprintln!("[create_tables_1.sql] ERROR: {e:?}");
             process::exit(1)
         }
     };
 
-    calculate_lr_data(&db).await;
+    calculate_lr_data(&db, &levels, &level_names).await;
+    calculate_dh_data(&db, &levels, &level_names).await;
 
     match sqlx::query(include_str!("../sql/create_tables_2.sql"))
         .execute(&db)
         .await
     {
-        Ok(_) => println!("[+] rebuilt all views"),
+        Ok(_) => println!("[+] rebuilt second half of tables/views"),
         Err(e) => {
-            eprintln!("[create_views.sql] ERROR: {e:?}");
+            eprintln!("[create_tables_2.sql] ERROR: {e:?}");
             process::exit(1)
         }
     };
 
     db
-}
-
-async fn calculate_lr_data(db: &Pool<Sqlite>) {
-    // get all counties, regions, and countries
-
-    let mut counties: Vec<String> = sqlx::query("select county_name from counties")
-        .fetch_all(db)
-        .await
-        .unwrap()
-        .iter()
-        .map(|row| row.get::<String, &str>("county_name"))
-        .collect();
-    let mut regions: Vec<String> = sqlx::query("select region_name from regions")
-        .fetch_all(db)
-        .await
-        .unwrap()
-        .iter()
-        .map(|row| row.get::<String, &str>("region_name"))
-        .collect();
-    let mut countries: Vec<String> = sqlx::query("select country_name from countries")
-        .fetch_all(db)
-        .await
-        .unwrap()
-        .iter()
-        .map(|row| row.get::<String, &str>("country_name"))
-        .collect();
-    //println!("{counties:?} \n \n {regions:?} \n \n {countries:?}");
-    let mut levels: Vec<Vec<String>> = vec![counties, regions, countries];
-    let mut level_names: Vec<String> = vec!["county".into(), "region".into(), "country".into()];
-
-    // iterate over counties and perform calculations
-    for (i, level) in levels.iter().enumerate() {
-        for loc in level {
-            let level_name = level_names.get(i).unwrap();
-            //println!("{i} {} {loc:?}", level_names.get(i).unwrap());
-            match sqlx::query("select * from lr_results where loc_name = $1 and level = $2")
-                .bind(loc)
-                .bind(level_name)
-                .fetch_all(db)
-                .await
-            {
-                Ok(e) => {
-                    let mut res: Vec<LrSetupRes> = Vec::new();
-                    let mut remaining_seats = 0;
-                    for row in &e {
-                        if level_name != "county" {
-                            println!("{level_name:?} {}", row.get::<&str, &str>("loc_name"))
-                        }
-                        res.push(LrSetupRes {
-                            party_name: row.get::<&str, &str>("party_name").to_string(),
-                            loc_name: row.get::<&str, &str>("loc_name").to_string(),
-                            seats: row.get::<i32, &str>("seats"),
-                        });
-                        remaining_seats = row.get("remaining_seats");
-                    }
-                    //println!("{:?} {res:#?}", level_names.get(i).unwrap());
-                    let mut cursor = 0;
-                    while remaining_seats > 0 {
-                        if cursor >= res.len() {
-                            cursor = 0
-                        }
-                        res.get_mut(cursor).unwrap().seats += 1;
-                        cursor += 1;
-                        remaining_seats -= 1;
-                    }
-                    for val in &res {
-                        sqlx::query("
-                            update lr_results set updated_seats = $1 where party_name = $2 and loc_name = $3 and level = $4;
-                            update lr_results set seat_percentage = (updated_seats / cast(loc_seats as float)) * 100 where party_name = $2 and loc_name = $3 and level = $4;")
-                            .bind(&val.seats)
-                            .bind(&val.party_name)
-                            .bind(&val.loc_name)
-                            .bind(level_names.get(i).unwrap())
-                            .execute(db).await.unwrap();
-                    }
-                }
-                Err(_) => (),
-            }
-        }
-    }
-
-    println!("[calculate lr data] largest remainder data calculated")
 }
