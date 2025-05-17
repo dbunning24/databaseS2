@@ -22,7 +22,7 @@ pub struct Results {
 pub struct LrSetupRes {
     pub party_name: String,
     pub loc_name: String,
-    pub seats: i32
+    pub seats: i32,
 }
 
 const DB_URL: &'static str = "sqlite://sqlite.db";
@@ -182,43 +182,64 @@ pub async fn setup() -> Pool<Sqlite> {
 }
 
 async fn calculate_lr_data(db: &Pool<Sqlite>) {
-
     // get all counties, regions, and countries
 
-    let mut counties: Vec<String> = sqlx::query("select county_name from counties").fetch_all(db).await.unwrap().iter().map(|row| row.get::<String,&str>("county_name")).collect();
-    let mut regions: Vec<String> = sqlx::query("select region_name from regions").fetch_all(db).await.unwrap().iter().map(|row| row.get::<String,&str>("region_name")).collect();
-    let mut countries: Vec<String> = sqlx::query("select country_name from countries").fetch_all(db).await.unwrap().iter().map(|row| row.get::<String,&str>("country_name")).collect();
-    println!("{counties:?} \n \n {regions:?} \n \n {countries:?}");
+    let mut counties: Vec<String> = sqlx::query("select county_name from counties")
+        .fetch_all(db)
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get::<String, &str>("county_name"))
+        .collect();
+    let mut regions: Vec<String> = sqlx::query("select region_name from regions")
+        .fetch_all(db)
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get::<String, &str>("region_name"))
+        .collect();
+    let mut countries: Vec<String> = sqlx::query("select country_name from countries")
+        .fetch_all(db)
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| row.get::<String, &str>("country_name"))
+        .collect();
+    //println!("{counties:?} \n \n {regions:?} \n \n {countries:?}");
     let mut levels: Vec<Vec<String>> = vec![counties, regions, countries];
-    let mut level_names: Vec<String> = vec!["county".into(), "regions".into(), "countries".into()];
-    
+    let mut level_names: Vec<String> = vec!["county".into(), "region".into(), "country".into()];
+
     // iterate over counties and perform calculations
     for (i, level) in levels.iter().enumerate() {
         for loc in level {
             let level_name = level_names.get(i).unwrap();
             //println!("{i} {} {loc:?}", level_names.get(i).unwrap());
-            match sqlx::query("select * from lr_results where loc_name = $1 and level = $2").bind(loc).bind(level_name).fetch_all(db).await {
+            match sqlx::query("select * from lr_results where loc_name = $1 and level = $2")
+                .bind(loc)
+                .bind(level_name)
+                .fetch_all(db)
+                .await
+            {
                 Ok(e) => {
-                    println!("{level_name:?}");
                     let mut res: Vec<LrSetupRes> = Vec::new();
                     let mut remaining_seats = 0;
                     for row in &e {
-                        if level_name == "region" {
-                            println!("{}", row.get::<&str, &str>("party_name").to_string());
+                        if level_name != "county" {
+                            println!("{level_name:?} {}", row.get::<&str, &str>("loc_name"))
                         }
-                        res.push( 
-                            LrSetupRes { 
-                                party_name: row.get::<&str, &str>("party_name").to_string(),
-                                loc_name: row.get::<&str, &str>("loc_name").to_string(), 
-                                seats: row.get::<i32, &str>("seats")
-                            }
-                        );
+                        res.push(LrSetupRes {
+                            party_name: row.get::<&str, &str>("party_name").to_string(),
+                            loc_name: row.get::<&str, &str>("loc_name").to_string(),
+                            seats: row.get::<i32, &str>("seats"),
+                        });
                         remaining_seats = row.get("remaining_seats");
                     }
                     //println!("{:?} {res:#?}", level_names.get(i).unwrap());
                     let mut cursor = 0;
                     while remaining_seats > 0 {
-                        if cursor >= res.len() {cursor = 0}
+                        if cursor >= res.len() {
+                            cursor = 0
+                        }
                         res.get_mut(cursor).unwrap().seats += 1;
                         cursor += 1;
                         remaining_seats -= 1;
@@ -233,13 +254,11 @@ async fn calculate_lr_data(db: &Pool<Sqlite>) {
                             .bind(level_names.get(i).unwrap())
                             .execute(db).await.unwrap();
                     }
-    
-                } 
-                Err(_) => ()
+                }
+                Err(_) => (),
             }
-    }
+        }
     }
 
     println!("[calculate lr data] largest remainder data calculated")
-
 }
