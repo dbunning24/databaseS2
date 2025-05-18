@@ -30,7 +30,7 @@ const DB_URL: &'static str = "sqlite://sqlite.db";
 async fn main() {
     // db setup and data calculation
     let db = setup().await;
-    //insert_data(&db).await;
+    insert_data(&db).await;
 
     // webserver setup
     let app = Router::new()

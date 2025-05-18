@@ -6,8 +6,8 @@ pub async fn insert_data(db: &Pool<Sqlite>) {
         "fptp".to_string(),       // First Past the Post
         "pr".to_string(),         // Proportional Representation
         "pr_th".to_string(),      // Proportional Representation with 5% threshold
-        "pr_county".to_string(),  // Proportioanl Representation by County
-        "pr_region".to_string(),  // Proportioanl Representation by Region
+        "pr_county".to_string(),  // Proportional Representation by County
+        "pr_region".to_string(),  // Proportional Representation by Region
         "pr_country".to_string(), // Proportional Representation by Country
         "lr_county".to_string(),  // Largest Remainder by County
         "lr_region".to_string(),  // Largest Remainder by Region

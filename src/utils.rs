@@ -64,7 +64,6 @@ pub async fn setup() -> Pool<Sqlite> {
 
     let db = SqlitePool::connect(DB_URL).await.unwrap();
     // get all counties, regions, and countries
-    /*
     let mut counties: Vec<String> = sqlx::query("select county_name from counties")
         .fetch_all(&db)
         .await
@@ -217,6 +216,5 @@ pub async fn setup() -> Pool<Sqlite> {
             process::exit(1)
         }
     };
-     */
     db
 }
