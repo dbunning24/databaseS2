@@ -20,9 +20,9 @@ select "Hybrid" as system,
             ps.seat_percentage < ps.vote_percentage, 
             "-" || round(ps.vote_percentage - ps.seat_percentage, 2),
             "+" || round(ps.seat_percentage - ps.vote_percentage, 2)
-        ) as [difference between percentage of votes and seats],
-        (select party_name from (select party_name, max(seats) from ps)) as [winning party],
-        max(ps.seats) over() - ps.seats as [seat difference from winner]
+        ) as difference_between_percentage_of_votes_of_and_seats,
+        (select party_name from (select party_name, max(seats) from ps)) as winning_party,
+        max(ps.seats) over() - ps.seats as seat_difference_from_winner
     from parties p
         join ps on ps.party_name = p.party_name
         and ps.seats > 0

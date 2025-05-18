@@ -177,13 +177,3 @@ CREATE VIEW IF NOT EXISTS vp AS
         where vote_percentage > 0
         group by party_name;
 
-CREATE TABLE IF NOT EXISTS results (
-    system VARCHAR(100) NOT NULL,
-    party VARCHAR(100) NOT NULL,
-    seats INTEGER NOT NULL,
-    seat_percentage FLOAT NOT NULL,
-    vote_percentage FLOAT NOT NULL,
-    [difference between percentage of votes and seats] FLOAT NOT NULL,
-    [winning party] VARCHAR(100) NOT NULL,
-    [seat difference from winner] INTEGER NOT NULL
-);

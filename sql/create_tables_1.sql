@@ -246,3 +246,14 @@ CREATE VIEW IF NOT EXISTS dh_quot AS
     loc_name, 
     max(votes / cast(seats + 1 as float)) as quot 
     from dh_results group by loc_name, level;
+
+CREATE TABLE IF NOT EXISTS results (
+    system VARCHAR(100) NOT NULL,
+    party VARCHAR(100) NOT NULL,
+    seats INTEGER NOT NULL,
+    seat_percentage FLOAT NOT NULL,
+    vote_percentage FLOAT NOT NULL,
+    difference_between_percentage_of_votes_and_seats FLOAT NOT NULL,
+    winning_party VARCHAR(100) NOT NULL,
+    seat_difference_from_winner INTEGER NOT NULL
+);

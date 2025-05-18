@@ -10,6 +10,18 @@ use std::{
 use crate::calculate::*;
 
 #[derive(FromRow, Debug, Clone)]
+pub struct Results {
+    pub system: String,
+    pub party: String,
+    pub seats: i32,
+    pub seat_percentage: f32,
+    pub vote_percentage: f32,
+    pub difference_between_percentage_of_votes_and_seats: f32,
+    pub winning_party: String,
+    pub seat_difference_from_winner: i32,
+}
+
+#[derive(FromRow, Debug, Clone)]
 pub struct LrSetupRes {
     pub party_name: String,
     pub loc_name: String,
@@ -52,7 +64,7 @@ pub async fn setup() -> Pool<Sqlite> {
 
     let db = SqlitePool::connect(DB_URL).await.unwrap();
     // get all counties, regions, and countries
-
+    /*
     let mut counties: Vec<String> = sqlx::query("select county_name from counties")
         .fetch_all(&db)
         .await
@@ -205,6 +217,6 @@ pub async fn setup() -> Pool<Sqlite> {
             process::exit(1)
         }
     };
-
+     */
     db
 }
